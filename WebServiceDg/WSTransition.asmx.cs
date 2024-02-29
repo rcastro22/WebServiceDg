@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -25,7 +26,9 @@ namespace WebServiceDg
         public string GuardarArchivoAsync(string Aplicacion, string Categoria, string NombreArchivo, string TipoContenido, string Contenido, string Usuario)
         {
             string ret = "";
-            Uri BaseUriDG = new Uri("https://betadg.galileo.edu/DG/");
+            string url = ConfigurationManager.AppSettings["UrlDg"];
+            //Uri BaseUriDG = new Uri("https://betadg.galileo.edu/DG/");
+            Uri BaseUriDG = new Uri(url);
             byte[] Contenido2;
             Contenido2 = Convert.FromBase64String(Contenido);
             try
