@@ -1,10 +1,13 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Web;
 using System.Web.Services;
@@ -86,6 +89,111 @@ namespace WebServiceDg
             }
         }
 
+
+        [WebMethod]
+        public DataSet ObtenerArchivosAsync(string Aplicacion, string Categoria, List<Etiquetas> Etiquetas)
+        {
+            DataSet dsNew = new DataSet();
+            string ret = "";
+            string url = ConfigurationManager.AppSettings["UrlDg"];
+            Uri BaseUriDG = new Uri(url);
+
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    client.BaseAddress = BaseUriDG;
+                    client.DefaultRequestHeaders.Accept.Clear();
+
+                    ObtenerArchivosRequest arch = new ObtenerArchivosRequest();
+                    arch.Aplicacion = Aplicacion;
+                    arch.categoria = Categoria;
+                    arch.Etiquetas = Etiquetas;
+
+
+                    StringContent Content = new StringContent(JsonConvert.SerializeObject(arch), Encoding.UTF8, "application/json");
+                    HttpContent httpContent = Content;
+                    httpContent.Headers.Add("Token", "Dynamics");
+                    System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                    HttpResponseMessage response = client.PostAsync("api/DG/ObtenerArchivos", httpContent).Result;
+
+                    response.EnsureSuccessStatusCode();
+
+                    var contentStream = response.Content.ReadAsStringAsync().Result;
+
+                    var root = JsonConvert.DeserializeObject<List<ObtenerArchivosResponse>>(contentStream);
+                    dsNew.Tables.Add(ToDataTable(root));
+                    return dsNew;
+                }
+                
+
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+
+
+        public DataTable ToDataTable<T>(List<T> items)
+        {
+            var tb = new DataTable(typeof(T).Name);
+
+            PropertyInfo[] props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+            foreach (PropertyInfo prop in props)
+            {
+                Type t = GetCoreType(prop.PropertyType);
+                tb.Columns.Add(prop.Name, t);
+            }
+
+            foreach (T item in items)
+            {
+                var values = new object[props.Length];
+
+                for (int i = 0; i < props.Length; i++)
+                {
+                    values[i] = props[i].GetValue(item, null);
+                }
+
+                tb.Rows.Add(values);
+            }
+
+            return tb;
+        }
+
+        /// <summary>
+        /// Determine of specified type is nullable
+        /// </summary>
+        public static bool IsNullable(Type t)
+        {
+            return !t.IsValueType || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
+        }
+
+        /// <summary>
+        /// Return underlying type if type is Nullable otherwise return the type
+        /// </summary>
+        public static Type GetCoreType(Type t)
+        {
+            if (t != null && IsNullable(t))
+            {
+                if (!t.IsValueType)
+                {
+                    return t;
+                }
+                else
+                {
+                    return Nullable.GetUnderlyingType(t);
+                }
+            }
+            else
+            {
+                return t;
+            }
+        }
+
     }
 
     public class archivos
@@ -97,7 +205,30 @@ namespace WebServiceDg
         public byte[] Contenido { get; set; }
         public string Usuario { get; set; }
         public List<Etiquetas> ListadoEtiquetas { get; set; }
-    }    
+    }
+
+    public class ObtenerArchivosRequest
+    {
+        public string Aplicacion { get; set; }
+        public string categoria { get; set; }
+        public List<Etiquetas> Etiquetas { get; set; }
+    }
+
+    public class ObtenerArchivosResponse
+    {
+        public int Idarchivo { get; set; }
+        public int Conteo { get; set; }
+        public string Caja { get; set; }
+        public string Nombreapp { get; set; }
+        public string Nombrecat { get; set; }
+        public string Aplicacion { get; set; }
+        public int Categoria { get; set; }
+        public string Nombre { get; set; }
+        public string Usuario { get; set; }
+        public string Extension { get; set; }
+        public string Fecha { get; set; }
+        public int Automatizado { get; set; }
+    }
 
     public class Etiquetas
     {
